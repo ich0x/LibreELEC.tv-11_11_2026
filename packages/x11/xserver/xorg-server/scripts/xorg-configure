@@ -38,6 +38,7 @@ XORG_CONF_DEFAULT_DRV="/etc/X11/xorg-${1}.conf"
 logger -t Xorg "### creating start options ###"
 
 XORG_ARGS="-s 0 -noreset -allowMouseOpenFail"
+XORG_SERVER="${XORG_SERVER:-/usr/bin/Xorg}"
 
 # load user defined xorg.conf, if exist
 if [ -f "${XORG_CONF_USER}" ]; then
@@ -86,3 +87,4 @@ fi
 logger -t Xorg "### starting Xorg with '${DISPLAY} vt01 ${XORG_ARGS}' ###"
 mkdir -p /run/libreelec
 echo "XORG_ARGS=\"${XORG_ARGS}\"" >/run/libreelec/xorg-settings.conf
+echo "XORG_SERVER=\"${XORG_SERVER}\"" >>/run/libreelec/xorg-settings.conf
