@@ -16,7 +16,11 @@ done
 
 if [ -e "$ARGS_FILE" ]; then
   . /run/libreelec/xorg-settings.conf
-  exec xorg-launch-helper $@ $XORG_ARGS
+  XORG_SERVER="${XORG_SERVER:-/usr/bin/Xorg}"
+  if [ -n "$XORG_SERVER" ] && [ -x "$XORG_SERVER" ]; then
+    exec "$XORG_SERVER" "$@" $XORG_ARGS
+  fi
+  exec xorg-launch-helper "$@" $XORG_ARGS
 else
   echo "" >/dev/tty1
   echo "failed to start xorg." >/dev/tty1
