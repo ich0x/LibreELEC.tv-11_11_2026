@@ -1,0 +1,27 @@
+--- a/src/main.c
++++ b/src/main.c
+@@ -132,14 +132,26 @@ int main(int argc, char **argv)
+ 	signal(SIGUSR1, SIG_IGN);
+ 
+ 	/* Step 3: find the X server */
+ 	if (!xserver) {
+-		if (!access("/usr/bin/Xorg", X_OK))
++		const char *configured_server = getenv("XORG_SERVER");
++
++		if (configured_server && configured_server[0] != '\0') {
++			if (access(configured_server, X_OK)) {
++				perror("XORG_SERVER is not executable");
++				exit(EXIT_FAILURE);
++			}
++			xserver = strdup(configured_server);
++			if (!xserver) {
++				perror("strdup");
++				exit(EXIT_FAILURE);
++			}
++		} else if (!access("/usr/bin/Xorg", X_OK))
+ 			xserver = "/usr/bin/Xorg";
+ 		else if (!access("/usr/bin/X", X_OK))
+ 			xserver = "/usr/bin/X";
+ 		else {
+ 			fprintf(stderr, "No X server found!");
+*** End Patch
