@@ -1,0 +1,54 @@
+name: Build XLibre Xserver
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  XLIBRE_SOURCE: "https://github.com"
+  XLIBRE_COMMIT: "8f47e0e2dd7a9f2dec43acffb2cf0f80b68e5b8e"
+  XLIBRE_SELECTABLE: "true"
+  PROJECT: "Generic"
+  ARCH: "x86_64"
+
+jobs:
+  build-xlibre:
+    runs-on: [self-hosted, ubuntu-22.04, xlibre, libreelec]
+
+    steps:
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git \
+            gcc \
+            g++ \
+            bison \
+            flex \
+            python3 \
+            meson \
+            ninja-build \
+            pkg-config \
+            libpixman-1-dev \
+            libdrm-dev \
+            libx11-dev \
+            libfontconfig1-dev \
+            libfreetype6-dev \
+            libxml2-dev \
+            libxkbcommon-dev \
+            libsystemd-dev
+
+      - name: Checkout XLibre source at specific commit
+        run: |
+          git clone "$XLIBRE_SOURCE" xserver
+          cd xserver
+          git checkout "$XLIBRE_COMMIT"
+
+      - name: Configure and build with Meson
+        working-directory: ./xserver
+        run: |
+          meson setup --prefix="$(pwd)/image" build
+          ninja -C build install
