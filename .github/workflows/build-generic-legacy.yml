@@ -1,0 +1,88 @@
+name: Build LibreELEC Generic-Legacy (XLibre/Xorg)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Maximize Runner Disk Space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          swap-storage: true
+
+      - name: Checkout Fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Ensure Generic-Legacy Selector Hook
+        run: |
+          if ! grep -q "x11-gpu-selector" projects/Generic/options; then
+            cat << 'EOF' >> projects/Generic/options
+
+          if [ "$DEVICE" = "Generic-legacy" ]; then
+            ADDITIONAL_PACKAGES="$ADDITIONAL_PACKAGES x11-gpu-selector"
+          fi
+          EOF
+          fi
+
+      - name: Install LibreELEC Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf automake autopoint bash bc binutils build-essential \
+            bzip2 cpio flex gawk gcc g++ git gzip intltool jq libc6-dev \
+            libncurses5-dev libssl-dev libtool libxml-parser-perl lzop \
+            m4 make patch patchutils perl pkg-config python3 \
+            python3-distutils-extra sed tar unzip uuid-dev wget \
+            xz-utils zlib1g-dev zstd
+
+      - name: Cache Downloaded Sources
+        uses: actions/cache@v4
+        with:
+          path: sources
+          key: le-sources-generic-legacy-${{ hashFiles('packages/**/package.mk') }}
+          restore-keys: |
+            le-sources-generic-legacy-
+
+      - name: Build Generic-Legacy Image
+        run: |
+          PROJECT=Generic DEVICE=Generic-legacy ARCH=x86_64 make image -j$(nproc)
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: LibreELEC-Generic-legacy-x86_64-${{ github.run_number }}
+          path: |
+            target/*.img.gz
+            target/*.tar
+            target/*.sha256
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: LibreELEC Generic-Legacy (XLibre/Xorg) #${{ github.run_number }}
+          body: |
+            Automated `Generic-legacy` (`x86_64`) build with runtime GPU-selectable **XLibre** (Intel/AMD) and **X.Org** (NVIDIA/fallback).
+            - Force XLibre: add `x11=xlibre` to kernel cmdline or `X11_SERVER="xlibre"` in `/storage/.config/x11-server.conf`
+            - Force Xorg: add `x11=xorg` to kernel cmdline or `X11_SERVER="xorg"` in `/storage/.config/x11-server.conf`
+          files: |
+            target/*.img.gz
+            target/*.tar
+            target/*.sha256
