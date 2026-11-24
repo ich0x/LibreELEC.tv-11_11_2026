@@ -1,0 +1,13 @@
+[Unit]
+Description=Select X11 Server (XLibre vs Xorg) for GPU
+DefaultDependencies=no
+Before=xorg.service
+After=systemd-udev-settle.service local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/x11-select.sh
+
+[Install]
+WantedBy=xorg.service
