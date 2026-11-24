@@ -40,16 +40,16 @@ jobs:
           EOF
           fi
 
-      - name: Install LibreELEC Build Dependencies
+            - name: Install LibreELEC Build Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             autoconf automake autopoint bash bc binutils build-essential \
-            bzip2 cpio flex gawk gcc g++ git gzip intltool jq libc6-dev \
-            libncurses5-dev libssl-dev libtool libxml-parser-perl lzop \
-            m4 make patch patchutils perl pkg-config python3 \
-            python3-distutils-extra sed tar unzip uuid-dev wget \
-            xz-utils zlib1g-dev zstd
+            bzip2 cpio flex gawk gcc g++ git gperf gzip intltool jq \
+            libc6-dev libncurses5-dev libparse-yapp-perl libssl-dev \
+            libtool libxml-parser-perl lzop m4 make patch patchutils perl \
+            pkg-config python3 python3-distutils-extra rdfind sed tar \
+            unzip uuid-dev wget xfonts-utils xsltproc xz-utils zlib1g-dev zstd
 
       - name: Cache Downloaded Sources
         uses: actions/cache@v4
