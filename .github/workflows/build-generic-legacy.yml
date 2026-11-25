@@ -97,3 +97,4 @@ jobs:
             target/*.img.gz
             target/*.tar
             target/*.sha256
+
