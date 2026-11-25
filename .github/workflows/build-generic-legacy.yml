@@ -1,8 +1,6 @@
 name: Build LibreELEC Generic-Legacy (XLibre/Xorg)
 
 on:
-  push:
-    branches: [ main, master ]
   workflow_dispatch:
 
 permissions:
@@ -29,11 +27,25 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Ensure Generic-Legacy Selector Hook
+      - name: Verify & Provision XLibre Packages + Virtual X11 Hook
         run: |
-          if ! grep -q "x11-gpu-selector" projects/Generic/options; then
-            printf '\nif [ "$DEVICE" = "Generic-legacy" ]; then\n  ADDITIONAL_PACKAGES="$ADDITIONAL_PACKAGES x11-gpu-selector"\nfi\n' >> projects/Generic/options
+          echo "=== Current Branch & Commit ==="
+          git status
+          git log -n 2 --oneline
+
+          echo "=== Checking Custom XLibre Packages ==="
+          for pkg in xlibre-server xlibre-input-libinput xlibre-video-amdgpu xlibre-video-intel xlibre-video-nouveau x11-gpu-selector; do
+            if [ ! -f "packages/x11/${pkg}/package.mk" ]; then
+              echo "ERROR: Missing packages/x11/${pkg}/package.mk!"
+              exit 1
+            fi
+          done
+
+          echo "=== Injecting x11-gpu-selector into packages/virtual/x11/package.mk ==="
+          if ! grep -q "x11-gpu-selector" packages/virtual/x11/package.mk; then
+            sed -i 's/PKG_DEPENDS_TARGET="/PKG_DEPENDS_TARGET="x11-gpu-selector /' packages/virtual/x11/package.mk
           fi
+          grep "PKG_DEPENDS_TARGET" packages/virtual/x11/package.mk
 
       - name: Install LibreELEC Build Dependencies
         run: |
@@ -53,6 +65,10 @@ jobs:
           key: le-sources-generic-legacy-${{ hashFiles('packages/**/package.mk') }}
           restore-keys: |
             le-sources-generic-legacy-
+
+      - name: Pre-Build XLibre & GPU Selector Packages
+        run: |
+          PROJECT=Generic DEVICE=Generic-legacy ARCH=x86_64 ./scripts/build x11-gpu-selector
 
       - name: Build Generic-Legacy Image
         run: |
