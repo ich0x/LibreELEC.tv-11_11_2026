@@ -1,6 +1,6 @@
 --- a/src/main.c
 +++ b/src/main.c
-@@ -132,14 +132,26 @@ int main(int argc, char **argv)
+@@ -132,12 +132,25 @@ int main(int argc, char **argv)
  	signal(SIGUSR1, SIG_IGN);
  
  	/* Step 3: find the X server */
@@ -24,4 +24,6 @@
  			xserver = "/usr/bin/X";
  		else {
  			fprintf(stderr, "No X server found!");
-*** End Patch
++			exit(EXIT_FAILURE);
+ 		}
+ 	}
