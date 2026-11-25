@@ -32,15 +32,10 @@ jobs:
       - name: Ensure Generic-Legacy Selector Hook
         run: |
           if ! grep -q "x11-gpu-selector" projects/Generic/options; then
-            cat << 'EOF' >> projects/Generic/options
-
-          if [ "$DEVICE" = "Generic-legacy" ]; then
-            ADDITIONAL_PACKAGES="$ADDITIONAL_PACKAGES x11-gpu-selector"
-          fi
-          EOF
+            printf '\nif [ "$DEVICE" = "Generic-legacy" ]; then\n  ADDITIONAL_PACKAGES="$ADDITIONAL_PACKAGES x11-gpu-selector"\nfi\n' >> projects/Generic/options
           fi
 
-            - name: Install LibreELEC Build Dependencies
+      - name: Install LibreELEC Build Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
