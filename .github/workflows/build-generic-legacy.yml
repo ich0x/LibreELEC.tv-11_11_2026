@@ -1,152 +1,56 @@
-name: Build LibreELEC Generic-Legacy (XLibre/Xorg)
+name: Build Legacy ISO
 
 on:
   schedule:
     - cron: '30 3 * * 0'
-  workflow_dispatch:
   workflow_run:
-    workflows: ["Sync Upstream LibreELEC"]
+    workflows: [Sync Upstream]
     types: [completed]
-
-permissions:
-  contents: write
+  workflow_dispatch:
 
 jobs:
   build:
+    name: Build LibreELEC with xlibre + legacy NVIDIA
     runs-on: ubuntu-24.04
-    timeout-minutes: 360
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'schedule' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success')
 
     steps:
-      - name: Maximize Runner Disk Space
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: true
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
-      - name: Extra Disk Cleanup & Initial Space Check
-        run: |
-          sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-          df -h /
-
-      - name: Checkout Fork
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          submodules: true
 
-      - name: Verify & Provision XLibre Packages + Virtual X11 Hook
-        run: |
-          echo "=== Current Branch & Commit ==="
-          git status
-          git log -n 2 --oneline
-
-          echo "=== Checking Custom XLibre Packages ==="
-          for pkg in xlibre-server xlibre-input-libinput xlibre-video-amdgpu xlibre-video-intel xlibre-video-nouveau x11-gpu-selector; do
-            if [ ! -f "packages/x11/${pkg}/package.mk" ]; then
-              echo "ERROR: Missing packages/x11/${pkg}/package.mk!"
-              exit 1
-            fi
-          done
-
-          echo "=== Injecting x11-gpu-selector into packages/virtual/x11/package.mk ==="
-          if ! grep -q "x11-gpu-selector" packages/virtual/x11/package.mk; then
-            sed -i 's/PKG_DEPENDS_TARGET="/PKG_DEPENDS_TARGET="x11-gpu-selector /' packages/virtual/x11/package.mk
-          fi
-          grep "PKG_DEPENDS_TARGET" packages/virtual/x11/package.mk
-
-      - name: Install LibreELEC Build Dependencies
+      - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            autoconf automake autopoint bash bc binutils build-essential \
-            bzip2 ca-certificates ccache cpio flex gawk gcc g++ git gperf \
-            gzip intltool jq libc6-dev libncurses5-dev libparse-yapp-perl \
-            libssl-dev libtool libxml-parser-perl lzop m4 make patch \
-            patchutils perl pkg-config python3 python3-distutils-extra \
-            rdfind sed tar unzip uuid-dev wget xfonts-utils xsltproc \
-            xz-utils zlib1g-dev zstd
-          sudo apt-get clean
-          sudo rm -rf /var/lib/apt/lists/*
+            gcc g++ bison flex python3 python3-pip python3-dev \
+            meson ninja-build pkg-config autoconf automake libtool \
+            xz-utils gzip bzip2 tar rsync \
+            libpixman-1-dev libdrm-dev libx11-dev libfontconfig1-dev \
+            libfreetype6-dev libxml2-dev libxkbcommon-dev libsystemd-dev \
+            libxrandr-dev libxi-dev libxcursor-dev libxinerama-dev \
+            libxext-dev libxfixes-dev libxau-dev libxcb1-dev \
+            libxshmfence-dev libv4l-dev libva-dev libpulse-dev \
+            libasound2-dev libgstreamer1.0-dev \
+            libgstreamer-plugins-base1.0-dev \
+            libvdpau-dev libxv-dev \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            libvulkan-dev libwayland-dev libxkbcommon-dev
 
-      - name: Restore ccache (Accelerated Repeat Builds)
-        uses: actions/cache@v4
-        with:
-          path: ~/.ccache
-          key: le-ccache-generic-legacy-${{ github.run_id }}
-          restore-keys: |
-            le-ccache-generic-legacy-
-
-      - name: Configure ccache Limits
+      - name: Build LibreELEC with xlibre + legacy NVIDIA
         run: |
-          mkdir -p ~/.ccache
-          ccache --set-config=max_size=6.0G
-          ccache --set-config=compression=true
-          ccache --set-config=compression_level=6
-          ccache -z
+          cd ./build
+          ./buildlibreelec.sh -p Generic -a x86_64 -j $(nproc)
 
-      - name: Pre-Build XLibre & Build Generic-Legacy Image (With 60s Monitor)
-        env:
-          CCACHE_DIR: /home/runner/.ccache
-          CCACHE_COMPRESS: "1"
-          CCACHE_MAXSIZE: "6G"
-        run: |
-          START_TS=$(date +%s)
-          MAX_SEC=$((355 * 60))
-
-          # Background monitor: prints disk % and time left every 60 seconds
-          (
-            while true; do
-              NOW_TS=$(date +%s)
-              ELAPSED=$((NOW_TS - START_TS))
-              REMAINING_MIN=$(( (MAX_SEC - ELAPSED) / 60 ))
-              DISK_INFO=$(df -h / | awk 'NR==2 {print $5 " used (" $3 "/" $2 ", " $4 " free)"}')
-              echo ">>> [MONITOR] Disk: ${DISK_INFO} | Est. Time Left: ~${REMAINING_MIN}m <<<"
-              sleep 60
-            done
-          ) &
-          MONITOR_PID=$!
-          trap "kill $MONITOR_PID 2>/dev/null || true" EXIT
-
-          echo "=== Step 1: Pre-building XLibre & GPU Selector ==="
-          PROJECT=Generic DEVICE=Generic-legacy ARCH=x86_64 ./scripts/build x11-gpu-selector
-
-          echo "=== Step 2: Building Full Generic-Legacy Image ==="
-          PROJECT=Generic DEVICE=Generic-legacy ARCH=x86_64 make image -j$(nproc)
-
-          echo "=== Step 3: Reclaiming Disk Before Artifact Upload ==="
-          rm -rf build.*/build build.*/toolchain sources/*/*.tar.* sources/*/*.zip || true
-          ccache -s
-          df -h /
-
-      - name: Upload Build Artifacts
+      - name: Upload ISO
         uses: actions/upload-artifact@v4
         with:
-          name: LibreELEC-Generic-legacy-x86_64-${{ github.run_number }}
-          path: |
-            target/*.img.gz
-            target/*.tar
-            target/*.sha256
-          retention-days: 14
-
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: build-${{ github.run_number }}
-          name: LibreELEC Generic-Legacy (XLibre/Xorg) #${{ github.run_number }}
-          body: |
-            Automated `Generic-legacy` (`x86_64`) build with runtime GPU-selectable **XLibre** (Intel/AMD) and **X.Org** (NVIDIA/fallback).
-            - Force XLibre: add `x11=xlibre` to kernel cmdline or `X11_SERVER="xlibre"` in `/storage/.config/x11-server.conf`
-            - Force Xorg: add `x11=xorg` to kernel cmdline or `X11_SERVER="xorg"` in `/storage/.config/x11-server.conf`
-          files: |
-            target/*.img.gz
-            target/*.tar
-            target/*.sha256
+          name: LibreELEC-x86_64-legacy
+          path: output/*.iso
+          retention-days: 30
