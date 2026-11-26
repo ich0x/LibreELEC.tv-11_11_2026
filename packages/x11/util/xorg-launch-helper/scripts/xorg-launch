@@ -14,6 +14,16 @@ for i in $(seq 1 40); do
   usleep 250000
 done
 
+# source profile.d scripts (sets XORG_SERVER etc)
+for f in /etc/profile.d/*.sh; do
+  [ -f "$f" ] && . "$f"
+done
+
+# source profile.d scripts (x11-gpu-selector sets XORG_SERVER here)
+for f in /etc/profile.d/*.sh; do
+  [ -f "$f" ] && . "$f"
+done
+
 if [ -e "$ARGS_FILE" ]; then
   . "$ARGS_FILE"
   exec env XORG_SERVER="${XORG_SERVER:-/usr/bin/Xorg}" xorg-launch-helper "$@" $XORG_ARGS

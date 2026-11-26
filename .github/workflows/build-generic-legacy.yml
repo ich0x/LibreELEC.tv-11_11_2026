@@ -1,11 +1,12 @@
 name: Build Legacy ISO
 
 on:
-  schedule:
-    - cron: '30 3 * * 0'
+  # No schedule — the Sync Upstream workflow triggers this via workflow_run.
+  # Manual dispatch is still available.
   workflow_run:
     workflows: [Sync Upstream]
     types: [completed]
+    branches: [master]
   workflow_dispatch:
 
 jobs:
@@ -14,7 +15,6 @@ jobs:
     runs-on: ubuntu-24.04
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'schedule' ||
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success')
 
@@ -42,6 +42,44 @@ jobs:
             libvdpau-dev libxv-dev \
             libgl1-mesa-dev libglu1-mesa-dev \
             libvulkan-dev libwayland-dev libxkbcommon-dev
+
+      - name: Verify NVIDIA driver manifests
+        run: |
+          set -e
+          declare -A SHA
+          declare -A EXPECT
+          SHA[304]="cd774539c322fca8328d382389a40f5aaece4c4bc562fac400f45af6ba7b78b1"
+          SHA[340]="995d44fef587ff5284497a47a95d71adbee0c13020d615e940ac928f180f5b77"
+          SHA[390]="162317a49aa5a521eb888ec12119bfe5a45cec4e8653efc575a2d04fb05bf581"
+          SHA[470]="493fda53120050f85836032324409be6c6484f90a0755ae0c6a673ba7626818b"
+          EXPECT[304]=14
+          EXPECT[340]=23
+          EXPECT[390]=29
+          EXPECT[470]=34
+          for ver in 304 340 390 470; do
+            url="https://download.nvidia.com/XFree86/Linux-x86_64/${ver}/NVIDIA-Linux-x86_64-${ver}-no-compat32.run"
+            # 304.137 and 340.108 are the only versions for their series
+            case $ver in
+              304) url="https://download.nvidia.com/XFree86/Linux-x86_64/304.137/NVIDIA-Linux-x86_64-304.137-no-compat32.run" ;;
+              340) url="https://download.nvidia.com/XFree86/Linux-x86_64/340.108/NVIDIA-Linux-x86_64-340.108-no-compat32.run" ;;
+              390) url="https://download.nvidia.com/XFree86/Linux-x86_64/390.157/NVIDIA-Linux-x86_64-390.157-no-compat32.run" ;;
+              470) url="https://download.nvidia.com/XFree86/Linux-x86_64/470.239.06/NVIDIA-Linux-x86_64-470.239.06-no-compat32.run" ;;
+            esac
+            curl -sL -o "driver_${ver}.run" "$url"
+            actual=$(sha256sum "driver_${ver}.run" | awk '{print $1}')
+            if [ "$actual" != "${SHA[$ver]}" ]; then
+              echo "SHA mismatch for ${ver}: got $actual, want ${SHA[$ver]}"
+              exit 1
+            fi
+            rm -rf "extract_${ver}" && mkdir -p "extract_${ver}"
+            sh "driver_${ver}.run" --extract-only --target "extract_${ver}"
+            count=$(ls extract_${ver}/lib*.so.* extract_${ver}/*.so.* 2>/dev/null | wc -l)
+            if [ "$count" -lt "${EXPECT[$ver]}" ]; then
+              echo "Library count mismatch for ${ver}: got $count, want ${EXPECT[$ver]}"
+              exit 1
+            fi
+            echo "${ver}: OK ($count libs)"
+          done
 
       - name: Build LibreELEC with xlibre + legacy NVIDIA
         run: |
