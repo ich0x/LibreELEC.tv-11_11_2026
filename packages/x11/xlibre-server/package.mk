@@ -14,8 +14,15 @@ PKG_MESON_OPTS_TARGET="--prefix=/usr/xlibre \
                        -Dxvfb=false \
                        -Dudev=true \
                        -Dsystemd_logind=true \
-                       -Dsuid_wrapper=false \
+                       -Dsuid_wrapper=true \
                        -Dxcsecurity=true \
                        -Ddri2=true \
                        -Ddri3=true \
-                       -Dglamor=true"
+                       -Dglamor=true \
+                       -Dlegacy_nvidia_padding=true \
+                       -Dlegacy_nvidia_340x=true \
+                       -Dmodesetting=true \
+                       -Dnamespace=true \
+                       -Dagp=true \
+                       -Dxf86_input_inputtest \
+                       -Dxf86_input_null"

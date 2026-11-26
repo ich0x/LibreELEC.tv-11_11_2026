@@ -1,0 +1,89 @@
+name: Build XLibre (standalone)
+
+on:
+  workflow_dispatch:
+    inputs:
+      xlibre_ref:
+        description: "XLibre git ref (branch/tag/commit)"
+        type: string
+        default: "main"
+
+jobs:
+  build-xlibre:
+    name: Build XLibre X Server
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout XLibre fork
+        uses: actions/checkout@v4
+        with:
+          repository: ich0x/x11libre-xserver-11_11_26
+          ref: ${{ inputs.xlibre_ref }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential meson ninja pkg-config \
+            libx11-dev libx11-xcb-dev libxau-dev libxcb1-dev \
+            libxcb-dri2-0-dev libxcb-dri3-dev libxcb-glx-dev \
+            libxcb-icccm4-dev libxcb-image-dev libxcb-keysyms1-dev \
+            libxcb-randr0-dev libxcb-render-util0-dev libxcb-shape-dev \
+            libxcb-shm0-dev libxcb-sync-dev libxcb-xfixes0-dev \
+            libxext-dev libxfixes-dev libxfont2-dev libxi-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev \
+            libxrender-dev libxshmfence-dev libxvbe3-dev libxvmc-dev \
+            libfontenc-dev libfreetype-dev libsm-dev libice-dev \
+            libexpat1-dev libsystemd-dev libudev-dev \
+            libxrandr-dev libxcursor-dev libxinerama-dev \
+            libpciaccess-dev libdrm-dev libgbm-dev \
+            libglvnd-dev libgl1-mesa-dev libglu1-mesa-dev \
+            libpixman-1-dev libepoxy-dev libxkbfile-dev
+
+      - name: Build XLibre
+        run: |
+          mkdir -p build
+          meson setup build \
+            --prefix=/usr/xlibre \
+            --libdir=lib \
+            -Dlegacy_nvidia_padding=true \
+            -Dlegacy_nvidia_340x=true \
+            -Dmodesetting=true \
+            -Dnamespace=true \
+            -Dagp=true \
+            -Dsuid_wrapper=true \
+            -Dxf86_input_inputtest \
+            -Dxf86_input_null \
+            -Dxorg=true \
+            -Dxwayland=false \
+            -Dxnest=false \
+            -Dxvfb=false \
+            -Dudev=true \
+            -Dsystemd_logind=true \
+            -Dxcsecurity=true \
+            -Ddri2=true \
+            -Ddri3=true \
+            -Dglamor=true
+          meson compile -C build
+          meson install -C build
+
+      - name: Create .deb package
+        run: |
+          mkdir -p xlibre-deb/usr/xlibre
+          cp -a build/_install/usr/xlibre/* xlibre-deb/usr/xlibre/
+          mkdir -p xlibre-deb/DEBIAN
+          cat > xlibre-deb/DEBIAN/control << 'EOF'
+Package: xlibre-server
+Version: 25.0.0.16
+Section: x11
+Priority: required
+Architecture: amd64
+Maintainer: ich0x <ich0x@users.noreply.github.com>
+Description: XLibre X11 display server with legacy NVIDIA driver support
+EOF
+          dpkg-deb --build xlibre-deb xlibre-server_25.0.0.16_amd64.deb
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xlibre-server-deb
+          path: xlibre-server_25.0.0.16_amd64.deb
