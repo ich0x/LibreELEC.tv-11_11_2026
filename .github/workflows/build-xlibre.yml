@@ -6,7 +6,7 @@ on:
       xlibre_ref:
         description: "XLibre git ref (branch/tag/commit)"
         type: string
-        default: "main"
+        default: "master"
 
 jobs:
   build-xlibre:
