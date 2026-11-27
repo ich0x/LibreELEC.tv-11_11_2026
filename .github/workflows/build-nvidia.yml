@@ -42,7 +42,7 @@ jobs:
       - name: Build nvidia.ko
         run: |
           cd extracted/kernel
-          make module KDIR=/lib/modules/$(uname -r)/build
+          make module KDIR=/lib/modules/$(uname -r)/build IGNORE_CC_MISMATCH=1
           cd ..
 
       - name: Package as rootfs tarball
