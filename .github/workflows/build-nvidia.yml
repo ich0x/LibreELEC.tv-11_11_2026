@@ -41,6 +41,8 @@ jobs:
 
       - name: Build nvidia.ko
         run: |
+          # Copy shared headers into kernel dir so make module can find them
+          cp extracted/*.h extracted/kernel/ 2>/dev/null || true
           cd extracted/kernel
           make module KDIR=/lib/modules/$(uname -r)/build IGNORE_CC_MISMATCH=1
           cd ..
