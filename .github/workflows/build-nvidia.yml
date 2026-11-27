@@ -54,7 +54,7 @@ jobs:
           make module
           cd ..
 
-      - name: Package as .deb
+      - name: Package as rootfs tarball
         run: |
           case "${{ matrix.version }}" in
             304) VER="304.137";;
@@ -63,17 +63,16 @@ jobs:
             470) VER="470.239.06";;
           esac
           PKG="nvidia-${{ matrix.version }}"
-          mkdir -p "$PKG/usr/lib/xorg/modules/drivers" \
-                   "$PKG/usr/lib/modules/nvidia-${{ matrix.version }}" \
-                   "$PKG/DEBIAN"
-          cp extracted/kernel/nvidia.ko "$PKG/usr/lib/modules/nvidia-${{ matrix.version }}/"
-          cp extracted/nvidia_drv.so "$PKG/usr/lib/xorg/modules/drivers/"
+          mkdir -p rootfs/usr/lib/xorg/modules/drivers \
+                   rootfs/usr/lib/modules/$PKG
+          cp extracted/kernel/nvidia.ko "rootfs/usr/lib/modules/$PKG/"
+          cp extracted/nvidia_drv.so "rootfs/usr/lib/xorg/modules/drivers/"
           # Copy all versioned shared libs
           for f in extracted/lib*.so.${VER}; do
-            [ -f "$f" ] && cp -P "$f" "$PKG/usr/lib/"
+            [ -f "$f" ] && cp -P "$f" rootfs/usr/lib/
           done
           # Create symlinks for key libs
-          cd "$PKG/usr/lib"
+          cd rootfs/usr/lib
           ln -sf libGL.so.${VER} libGL.so
           ln -sf libglx.so.${VER} libGLX.so
           ln -sf libnvidia-tls.so.${VER} libnvidia-tls.so
@@ -85,20 +84,14 @@ jobs:
           ln -sf libnvidia-fbc.so.${VER} libnvidia-fbc.so
           ln -sf libnvidia-encode.so.${VER} libnvidia-encode.so
           ln -sf libnvidia-eglcore.so.${VER} libnvidia-eglcore.so
-          cd "$PKG"
-          cat > DEBIAN/control << EOF
-Package: $PKG
-Version: $VER
-Section: graphics
-Priority: optional
-Architecture: amd64
-Maintainer: ich0x <ich0x@users.noreply.github.com>
-Description: NVIDIA $VER legacy driver (portable for Lakka/Batocera)
-EOF
-          dpkg-deb --build "$PKG" "$PKG_${VER}_amd64.deb"
+          cd ../..
+          tar -czf "${PKG}_${VER}.tar.gz" -C rootfs usr/lib
+
+      - name: List packaged files
+        run: tar -tzf nvidia-${{ matrix.version }}_*.tar.gz | sort
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nvidia-${{ matrix.version }}-deb
-          path: nvidia-${{ matrix.version }}_*.deb
+          name: nvidia-${{ matrix.version }}-rootfs
+          path: nvidia-${{ matrix.version }}_*.tar.gz

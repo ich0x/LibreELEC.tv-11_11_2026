@@ -66,24 +66,19 @@ jobs:
           meson compile -C build
           meson install -C build
 
-      - name: Create .deb package
+      - name: Package as rootfs tarball
         run: |
-          mkdir -p xlibre-deb/usr/xlibre
-          cp -a build/_install/usr/xlibre/* xlibre-deb/usr/xlibre/
-          mkdir -p xlibre-deb/DEBIAN
-          cat > xlibre-deb/DEBIAN/control << 'EOF'
-Package: xlibre-server
-Version: 25.0.0.16
-Section: x11
-Priority: required
-Architecture: amd64
-Maintainer: ich0x <ich0x@users.noreply.github.com>
-Description: XLibre X11 display server with legacy NVIDIA driver support
-EOF
-          dpkg-deb --build xlibre-deb xlibre-server_25.0.0.16_amd64.deb
+          mkdir -p rootfs
+          cp -a build/_install/usr/xlibre rootfs/usr/xlibre
+          tar -czf xlibre-server_25.0.0.16.tar.gz -C rootfs usr/xlibre
+
+      - name: List installed files
+        run: |
+          echo "=== Installed files ==="
+          find build/_install/usr/xlibre -type f | sort
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: xlibre-server-deb
-          path: xlibre-server_25.0.0.16_amd64.deb
+          name: xlibre-server-rootfs
+          path: xlibre-server_25.0.0.16.tar.gz
