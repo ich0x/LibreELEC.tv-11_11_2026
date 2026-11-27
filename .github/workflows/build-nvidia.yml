@@ -42,7 +42,7 @@ jobs:
       - name: Build nvidia.ko
         run: |
           cd extracted/kernel
-          make module
+          make module KDIR=/lib/modules/$(uname -r)/build
           cd ..
 
       - name: Package as rootfs tarball
