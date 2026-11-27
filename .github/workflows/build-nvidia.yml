@@ -1,1 +1,86 @@
-name: Build NVIDIA legacy drivers (standalone)on:  workflow_dispatch:    inputs:      kernel_version:        description: "Kernel version to build nvidia.ko against (blank = runner's kernel)"        type: string        default: ""jobs:  build-nvidia:    name: Build NVIDIA ${{ matrix.version }}    runs-on: ubuntu-24.04    strategy:      fail-fast: false      matrix:        version: [304, 340, 390, 470]    steps:      - name: Install dependencies        run: |          sudo apt-get update          sudo apt-get install -y --no-install-recommends \            build-essential pkg-config \            libglvnd-dev libgl1-mesa-dev libglu1-mesa-dev \            libvdpau-dev libx11-dev libxext-dev libxfixes-dev \            libxi-dev libudev-dev libdbus-1-dev \            dkms linux-headers-generic      - name: Download NVIDIA ${{ matrix.version }} .run        run: |          case "${{ matrix.version }}" in            304) VER="304.137";;            340) VER="340.108";;            390) VER="390.157";;            470) VER="470.239.06";;          esac          wget -q "http://us.download.nvidia.com/XFree86/Linux-x86_64/${VER}/NVIDIA-Linux-x86_64-${VER}-no-compat32.run" -O nvidia.run      - name: Extract .run        run: ./nvidia.run --extract-only --target extracted      - name: Build nvidia.ko        run: |          cd extracted/kernel          make module          cd ..      - name: Package as rootfs tarball        run: |          case "${{ matrix.version }}" in            304) VER="304.137";;            340) VER="340.108";;            390) VER="390.157";;            470) VER="470.239.06";;          esac          PKG="nvidia-${{ matrix.version }}"          mkdir -p rootfs/usr/lib/xorg/modules/drivers \                   rootfs/usr/lib/modules/$PKG          cp extracted/kernel/nvidia.ko "rootfs/usr/lib/modules/$PKG/"          cp extracted/nvidia_drv.so "rootfs/usr/lib/xorg/modules/drivers/"          # Copy all versioned shared libs          for f in extracted/lib*.so.${VER}; do            [ -f "$f" ] && cp -P "$f" rootfs/usr/lib/          done          # Create symlinks for key libs          cd rootfs/usr/lib          ln -sf libGL.so.${VER} libGL.so          ln -sf libglx.so.${VER} libGLX.so          ln -sf libnvidia-tls.so.${VER} libnvidia-tls.so          ln -sf libnvidia-ml.so.${VER} libnvidia-ml.so          ln -sf libnvidia-glcore.so.${VER} libnvidia-glcore.so          ln -sf libEGL.so.${VER} libEGL.so          ln -sf libnvcuvid.so.${VER} libnvcuvid.so          ln -sf libnvidia-opencl.so.${VER} libnvidia-opencl.so          ln -sf libnvidia-fbc.so.${VER} libnvidia-fbc.so          ln -sf libnvidia-encode.so.${VER} libnvidia-encode.so          ln -sf libnvidia-eglcore.so.${VER} libnvidia-eglcore.so          cd ../..          tar -czf "${PKG}_${VER}.tar.gz" -C rootfs usr/lib      - name: List packaged files        run: tar -tzf nvidia-${{ matrix.version }}_*.tar.gz | sort      - name: Upload artifact        uses: actions/upload-artifact@v4        with:          name: nvidia-${{ matrix.version }}-rootfs          path: nvidia-${{ matrix.version }}_*.tar.gz
+name: Build NVIDIA legacy drivers (standalone)
+on:
+  workflow_dispatch:
+    # Builds against the runner's own kernel (linux-headers-generic, ubuntu-24.04).
+    # LibreELEC's custom kernel 7.3.4 has no apt headers on ubuntu-24.04,
+    # so the .ko is loaded at runtime by whatever kernel is running on the target.
+
+jobs:
+  build-nvidia:
+    name: Build NVIDIA ${{ matrix.version }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [304, 340, 390, 470]
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential pkg-config \
+            libglvnd-dev libgl1-mesa-dev libglu1-mesa-dev \
+            libvdpau-dev libx11-dev libxext-dev libxfixes-dev \
+            libxi-dev libudev-dev libdbus-1-dev \
+            dkms linux-headers-generic
+
+      - name: Download NVIDIA ${{ matrix.version }} .run
+        run: |
+          case "${{ matrix.version }}" in
+            304) VER="304.137";;
+            340) VER="340.108";;
+            390) VER="390.157";;
+            470) VER="470.239.06";;
+          esac
+          wget -q "http://us.download.nvidia.com/XFree86/Linux-x86_64/${VER}/NVIDIA-Linux-x86_64-${VER}-no-compat32.run" -O nvidia.run
+
+      - name: Extract .run
+        run: ./nvidia.run --extract-only --target extracted
+
+      - name: Build nvidia.ko
+        run: |
+          cd extracted/kernel
+          make module
+          cd ..
+
+      - name: Package as rootfs tarball
+        run: |
+          case "${{ matrix.version }}" in
+            304) VER="304.137";;
+            340) VER="340.108";;
+            390) VER="390.157";;
+            470) VER="470.239.06";;
+          esac
+          PKG="nvidia-${{ matrix.version }}"
+          mkdir -p rootfs/usr/lib/xorg/modules/drivers \
+                   rootfs/usr/lib/modules/$PKG
+          cp extracted/kernel/nvidia.ko "rootfs/usr/lib/modules/$PKG/"
+          cp extracted/nvidia_drv.so "rootfs/usr/lib/xorg/modules/drivers/"
+          # Copy all versioned shared libs
+          for f in extracted/lib*.so.${VER}; do
+            [ -f "$f" ] && cp -P "$f" rootfs/usr/lib/
+          done
+          # Create symlinks for key libs
+          cd rootfs/usr/lib
+          ln -sf libGL.so.${VER} libGL.so
+          ln -sf libglx.so.${VER} libGLX.so
+          ln -sf libnvidia-tls.so.${VER} libnvidia-tls.so
+          ln -sf libnvidia-ml.so.${VER} libnvidia-ml.so
+          ln -sf libnvidia-glcore.so.${VER} libnvidia-glcore.so
+          ln -sf libEGL.so.${VER} libEGL.so
+          ln -sf libnvcuvid.so.${VER} libnvcuvid.so
+          ln -sf libnvidia-opencl.so.${VER} libnvidia-opencl.so
+          ln -sf libnvidia-fbc.so.${VER} libnvidia-fbc.so
+          ln -sf libnvidia-encode.so.${VER} libnvidia-encode.so
+          ln -sf libnvidia-eglcore.so.${VER} libnvidia-eglcore.so
+          cd ../..
+          tar -czf "${PKG}_${VER}.tar.gz" -C rootfs usr/lib
+
+      - name: List packaged files
+        run: tar -tzf nvidia-${{ matrix.version }}_*.tar.gz | sort
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nvidia-${{ matrix.version }}-rootfs
+          path: nvidia-${{ matrix.version }}_*.tar.gz
